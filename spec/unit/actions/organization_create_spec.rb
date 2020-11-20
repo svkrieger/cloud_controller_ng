@@ -28,7 +28,7 @@ module VCAP::CloudController
         end
 
         it 'creates a organization' do
-          organization = org_create.create(message)
+          organization = org_create.create(message, user)
 
           expect(organization.name).to eq('my-organization')
 
@@ -44,7 +44,7 @@ module VCAP::CloudController
         end
 
         it 'creates an audit event' do
-          created_org = org_create.create(message)
+          created_org = org_create.create(message, user)
           expect(VCAP::CloudController::Event.count).to eq(1)
           event = VCAP::CloudController::Event.first
           expect(event.values).to include(
@@ -68,7 +68,7 @@ module VCAP::CloudController
           name: 'my-organization',
           suspended: true
         })
-        organization = org_create.create(message)
+        organization = org_create.create(message, user)
 
         expect(organization.name).to eq('my-organization')
         expect(organization.suspended?).to be true
@@ -83,7 +83,7 @@ module VCAP::CloudController
 
           message = VCAP::CloudController::OrganizationUpdateMessage.new(name: 'foobar')
           expect {
-            org_create.create(message)
+            org_create.create(message, user)
           }.to raise_error(OrganizationCreate::Error, 'blork is busted')
         end
 
@@ -97,7 +97,7 @@ module VCAP::CloudController
           it 'raises a human-friendly error' do
             message = VCAP::CloudController::OrganizationUpdateMessage.new(name: name)
             expect {
-              org_create.create(message)
+              org_create.create(message, user)
             }.to raise_error(OrganizationCreate::Error, "Organization '#{name}' already exists.")
           end
         end
