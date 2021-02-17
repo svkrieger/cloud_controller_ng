@@ -331,6 +331,7 @@ module VCAP::CloudController
               'aud' => 'resource-id',
               'payload' => 123, 'exp' => Time.now.utc.to_i,
               'jti' => 'adb2aa5535d04a3180ec56927c859549',
+              'iss'     => uaa_issuer_string,
             }
           end
 
@@ -338,7 +339,7 @@ module VCAP::CloudController
             expect(logger).to receive(:warn).with(/token expired/i)
             expect {
               subject.decode_token("bearer #{generate_token(rsa_key, token_content)}")
-            }.to raise_error(VCAP::CloudController::UaaTokenDecoder::BadToken)
+            }.to raise_error(VCAP::CloudController::UaaTokenDecoder::TokenExpired)
           end
         end
 
@@ -472,7 +473,7 @@ module VCAP::CloudController
               expect(logger).to receive(:warn).with(/token expired/i)
               expect {
                 subject.decode_token("bearer #{token}")
-              }.to raise_error(VCAP::CloudController::UaaTokenDecoder::BadToken)
+              }.to raise_error(VCAP::CloudController::UaaTokenDecoder::TokenExpired)
             end
           end
 

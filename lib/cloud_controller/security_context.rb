@@ -49,11 +49,15 @@ module VCAP::CloudController
     end
 
     def self.valid_token?
-      token && token != :invalid_token
+      token && token != :invalid_token && token != :expired_token
     end
 
     def self.invalid_token?
       !valid_token?
+    end
+
+    def self.expired_token?
+      token && token == :expired_token
     end
 
     def self.scopes

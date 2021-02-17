@@ -4,6 +4,8 @@ module VCAP::CloudController
   class UaaTokenDecoder
     class BadToken < StandardError
     end
+    class TokenExpired < BadToken
+    end
 
     attr_reader :config
 
@@ -30,7 +32,7 @@ module VCAP::CloudController
       end
     rescue CF::UAA::TokenExpired => e
       @logger.warn('Token expired')
-      raise BadToken.new(e.message)
+      raise TokenExpired.new(e.message)
     rescue CF::UAA::DecodeError, CF::UAA::AuthError => e
       @logger.warn("Invalid bearer token: #{e.inspect} #{e.backtrace}")
       raise BadToken.new(e.message)
@@ -73,11 +75,21 @@ module VCAP::CloudController
     end
 
     def decode_token_with_key(auth_token, options)
-      options         = { audience_ids: config[:resource_id] }.merge(options)
-      token           = CF::UAA::TokenCoder.new(options).decode_at_reference_time(auth_token, Time.now.utc.to_i - @grace_period_in_seconds)
-      expiration_time = token['exp'] || token[:exp]
-      if expiration_time && expiration_time < Time.now.utc.to_i
-        @logger.warn("token currently expired but accepted within grace period of #{@grace_period_in_seconds} seconds")
+      token_expired_error = nil
+      options = { audience_ids: config[:resource_id] }.merge(options)
+
+      # If the token is expired, continue following checks and raise the TokenExpired error at the end of this function
+      # This is needed to be able to implement more graceful handling of requests with expired, but otherwise valid tokens
+      begin
+        token = CF::UAA::TokenCoder.new(options).decode_at_reference_time_exp_warn_only(auth_token, Time.now.utc.to_i - @grace_period_in_seconds)
+
+        expiration_time = token['exp'] || token[:exp]
+        if expiration_time && expiration_time < Time.now.utc.to_i
+          @logger.warn("token currently expired but accepted within grace period of #{@grace_period_in_seconds} seconds")
+        end
+      rescue CF::UAA::TokenExpired => e
+        token_expired_error = e
+        token = e.decoded_token
       end
 
       raise BadToken.new('Incorrect token') unless access_token?(token)
@@ -85,6 +97,12 @@ module VCAP::CloudController
       if token['iss'] != uaa_issuer
         @uaa_issuer = nil
         raise BadToken.new('Incorrect issuer') if token['iss'] != uaa_issuer
+      end
+
+      # Here we know the token is valid in general. If it is expired, the error is thrown here.
+      # This enables middlewares to handle requests with expired tokens more gracefully.
+      if token_expired_error
+        raise token_expired_error
       end
 
       token

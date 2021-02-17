@@ -167,7 +167,7 @@ module VCAP::CloudController
           end
         end
 
-        context 'when the auth_token is invalid or expired' do
+        context 'when the auth_token is invalid' do
           before do
             allow(token_decoder).to receive(:decode_token).with(auth_token).and_raise(VCAP::CloudController::UaaTokenDecoder::BadToken)
             SecurityContext.set('value', 'another')
@@ -177,6 +177,20 @@ module VCAP::CloudController
             expect { configurer.configure(auth_token) }.not_to raise_error
             expect(SecurityContext.current_user).to be_nil
             expect(SecurityContext.token).to eq(:invalid_token)
+            expect(SecurityContext.auth_token).to eq(auth_token)
+          end
+        end
+
+        context 'when the auth_token is expired, but valid otherwise' do
+          before do
+            allow(token_decoder).to receive(:decode_token).with(auth_token).and_raise(VCAP::CloudController::UaaTokenDecoder::TokenExpired)
+            SecurityContext.set('value', 'another')
+          end
+
+          it 'sets the SecurityContext user and token to error values' do
+            expect { configurer.configure(auth_token) }.not_to raise_error
+            expect(SecurityContext.current_user).to be_nil
+            expect(SecurityContext.token).to eq(:expired_token)
             expect(SecurityContext.auth_token).to eq(auth_token)
           end
         end

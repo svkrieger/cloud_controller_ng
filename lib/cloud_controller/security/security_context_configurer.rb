@@ -12,6 +12,8 @@ module VCAP::CloudController
         user = user_from_token(decoded_token)
         set_is_oauth_client(user, decoded_token)
         VCAP::CloudController::SecurityContext.set(user, decoded_token, header_token)
+      rescue VCAP::CloudController::UaaTokenDecoder::TokenExpired
+        VCAP::CloudController::SecurityContext.set(nil, :expired_token, header_token)
       rescue VCAP::CloudController::UaaTokenDecoder::BadToken
         VCAP::CloudController::SecurityContext.set(nil, :invalid_token, header_token)
       end
